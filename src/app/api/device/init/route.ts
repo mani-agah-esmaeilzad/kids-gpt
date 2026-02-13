@@ -2,6 +2,9 @@ import { NextResponse } from "next/server";
 import { getOrCreateDeviceId } from "@/lib/device-session";
 import { prisma } from "@/lib/db";
 
+export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
+
 export async function POST() {
   const deviceId = await getOrCreateDeviceId();
   await prisma.kidDeviceSession.upsert({
