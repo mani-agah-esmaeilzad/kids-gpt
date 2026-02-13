@@ -1,5 +1,5 @@
 import { getServerAuthSession } from "@/lib/auth";
-import { ParentSidebar } from "@/components/parent-sidebar";
+import { ParentSidebar } from "@/components/layout/parent-sidebar";
 import { SignOutButton } from "@/components/signout-button";
 
 export default async function AppLayout({

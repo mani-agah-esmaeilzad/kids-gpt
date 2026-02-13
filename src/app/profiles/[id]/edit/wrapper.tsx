@@ -1,7 +1,7 @@
 "use client";
 
 import { ProfileForm } from "@/components/profiles/profile-form";
-import { updateProfile } from "../actions";
+import { updateProfile } from "../../actions";
 import { useState } from "react";
 
 export function EditProfileWrapper({
