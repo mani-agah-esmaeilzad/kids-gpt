@@ -8,6 +8,9 @@ import { checkQuotas } from "@/lib/quotas";
 import { rateLimit } from "@/lib/rate-limit";
 import { logEvent } from "@/lib/logger";
 
+export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
+
 export async function POST(request: Request) {
   const sseHeaders = {
     "Content-Type": "text/event-stream",

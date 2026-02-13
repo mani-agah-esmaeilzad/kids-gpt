@@ -4,6 +4,9 @@ import { SignOutButton } from "@/components/signout-button";
 import { AdminCommandPalette } from "@/components/admin-command";
 import { ThemeToggle } from "@/components/theme-toggle";
 
+export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
+
 export default async function AdminLayout({
   children
 }: {

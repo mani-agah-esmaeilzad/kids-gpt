@@ -1,9 +1,11 @@
 import { redirect } from "next/navigation";
-import { getServerAuthSession } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { cookies } from "next/headers";
 import { MascotHeader } from "@/components/layout/mascot-header"; // I will create this if not exists
 import { KidNav } from "@/components/layout/kid-nav"; // Navigation for kids
+
+export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
 
 async function getActiveChild() {
     const cookieStore = cookies();

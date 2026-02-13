@@ -2,6 +2,9 @@ import { getServerAuthSession } from "@/lib/auth";
 import { ParentSidebar } from "@/components/layout/parent-sidebar";
 import { SignOutButton } from "@/components/signout-button";
 
+export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
+
 export default async function AppLayout({
   children
 }: {
