@@ -1,0 +1,301 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  PARENT
+  ADMIN
+}
+
+enum AgeGroup {
+  AGE_6_8
+  AGE_9_12
+  AGE_13_15
+}
+
+enum MessageRole {
+  USER
+  ASSISTANT
+  SYSTEM
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  TRIALING
+  PAST_DUE
+  CANCELED
+  INACTIVE
+}
+
+enum IncidentType {
+  PII
+  SELF_HARM
+  SEXUAL
+  VIOLENCE
+  ILLEGAL
+  GROOMING
+  OTHER
+}
+
+enum IncidentAction {
+  ALLOW
+  REFUSE
+  ESCALATE
+}
+
+enum PaymentStatus {
+  PENDING
+  PAID
+  FAILED
+  REFUNDED
+}
+
+enum CouponDuration {
+  ONCE
+  REPEATING
+  FOREVER
+}
+
+model User {
+  id            String         @id @default(cuid())
+  email         String         @unique
+  passwordHash  String
+  role          UserRole       @default(PARENT)
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  parentProfile ParentProfile?
+  accounts      Account[]
+  sessions      Session[]
+  auditLogs     AuditLog[]
+}
+
+model ParentProfile {
+  id            String           @id @default(cuid())
+  userId        String           @unique
+  displayName   String
+  locale        String           @default("fa-IR")
+  preferences   Json             @default("{}")
+  children      ChildProfile[]
+  subscriptions Subscription[]
+  usageLedger   UsageLedger[]
+  incidents     SafetyIncident[]
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model ChildProfile {
+  id             String             @id @default(cuid())
+  parentId       String
+  nickname       String
+  ageGroup       AgeGroup
+  avatarKey      String
+  settings       Json               @default("{}")
+  isActive       Boolean            @default(true)
+  conversations  Conversation[]
+  usageLedger    UsageLedger[]
+  incidents      SafetyIncident[]
+  deviceSessions KidDeviceSession[]
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+
+  parent ParentProfile @relation(fields: [parentId], references: [id], onDelete: Cascade)
+}
+
+model KidDeviceSession {
+  id            String   @id @default(cuid())
+  deviceId      String   @unique
+  activeChildId String?
+  lastSeenAt    DateTime @default(now())
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  activeChild ChildProfile? @relation(fields: [activeChildId], references: [id], onDelete: SetNull)
+
+  @@index([activeChildId])
+}
+
+model Conversation {
+  id        String    @id @default(cuid())
+  childId   String
+  title     String?
+  messages  Message[]
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  child ChildProfile @relation(fields: [childId], references: [id], onDelete: Cascade)
+}
+
+model Message {
+  id             String      @id @default(cuid())
+  conversationId String
+  role           MessageRole
+  content        String
+  tokens         Int         @default(0)
+  blocked        Boolean     @default(false)
+  createdAt      DateTime    @default(now())
+
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+}
+
+model Plan {
+  id            String         @id @default(cuid())
+  name          String         @unique
+  description   String
+  priceMonthly  Int
+  priceYearly   Int
+  currency      String         @default("IRR")
+  limits        Json
+  features      Json
+  isActive      Boolean        @default(true)
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  subscriptions Subscription[]
+}
+
+model Subscription {
+  id                 String             @id @default(cuid())
+  parentId           String
+  planId             String
+  status             SubscriptionStatus @default(INACTIVE)
+  currentPeriodStart DateTime           @default(now())
+  currentPeriodEnd   DateTime?
+  cancelAtPeriodEnd  Boolean            @default(false)
+  metadata           Json               @default("{}")
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+  payments           Payment[]
+
+  parent ParentProfile @relation(fields: [parentId], references: [id], onDelete: Cascade)
+  plan   Plan          @relation(fields: [planId], references: [id], onDelete: Restrict)
+
+  @@unique([parentId])
+  @@index([status])
+}
+
+model Payment {
+  id             String        @id @default(cuid())
+  subscriptionId String
+  provider       String
+  amount         Int
+  currency       String        @default("IRR")
+  status         PaymentStatus @default(PENDING)
+  reference      String?
+  createdAt      DateTime      @default(now())
+
+  subscription Subscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+}
+
+model UsageLedger {
+  id           String   @id @default(cuid())
+  parentId     String
+  childId      String?
+  date         DateTime @default(now())
+  messages     Int      @default(0)
+  tokens       Int      @default(0)
+  model        String?
+  costEstimate Float    @default(0)
+  outcome      String?
+  latencyMs    Int?
+
+  parent ParentProfile @relation(fields: [parentId], references: [id], onDelete: Cascade)
+  child  ChildProfile? @relation(fields: [childId], references: [id], onDelete: SetNull)
+
+  @@index([parentId, date])
+  @@index([childId, date])
+}
+
+model SafetyIncident {
+  id             String         @id @default(cuid())
+  parentId       String
+  childId        String
+  conversationId String?
+  messageId      String?
+  type           IncidentType
+  severity       Int            @default(1)
+  direction      String
+  contentExcerpt String
+  action         IncidentAction
+  resolvedAt     DateTime?
+  createdAt      DateTime       @default(now())
+
+  parent ParentProfile @relation(fields: [parentId], references: [id], onDelete: Cascade)
+  child  ChildProfile  @relation(fields: [childId], references: [id], onDelete: Cascade)
+
+  @@index([parentId, createdAt])
+  @@index([childId, createdAt])
+}
+
+model AuditLog {
+  id          String   @id @default(cuid())
+  actorUserId String
+  action      String
+  metadata    Json     @default("{}")
+  createdAt   DateTime @default(now())
+
+  actor User @relation(fields: [actorUserId], references: [id], onDelete: Cascade)
+}
+
+model Coupon {
+  id               String         @id @default(cuid())
+  code             String         @unique
+  percentOff       Int?
+  amountOff        Int?
+  currency         String         @default("IRR")
+  maxRedemptions   Int?
+  redeemedCount    Int            @default(0)
+  redeemBy         DateTime?
+  duration         CouponDuration @default(ONCE)
+  durationInMonths Int?
+  isActive         Boolean        @default(true)
+  createdAt        DateTime       @default(now())
+}
+
+model AppConfig {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  value     Json
+  updatedAt DateTime @updatedAt
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
