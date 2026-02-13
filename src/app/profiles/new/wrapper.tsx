@@ -3,9 +3,6 @@
 import { ProfileForm } from "@/components/profiles/profile-form";
 import { createProfile } from "../actions";
 import { useState } from "react";
-import { toast } from "sonner"; // Assuming sonner is installed, if not will fallback or install
-// If sonner is not installed, I'll need to check. But for now I'll use simple alert or console error if it fails, 
-// or I can check package.json. `shadcn` usually installs `sonner`.
 
 export function NewProfileWrapper() {
     const [isProcessing, setIsProcessing] = useState(false);

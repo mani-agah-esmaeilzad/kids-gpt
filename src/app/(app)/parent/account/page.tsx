@@ -24,9 +24,9 @@ export default async function ParentAccountPage() {
                 </CardHeader>
                 <CardContent className="space-y-4">
                     <div className="grid gap-2">
-                        <Label>شماره موبایل</Label>
-                        <Input defaultValue={session.user.mobile ?? ""} disabled />
-                        <p className="text-xs text-muted-foreground">شماره موبایل شناسه کاربری شماست و قابل تغییر نیست.</p>
+                        <Label>ایمیل / نام کاربری</Label>
+                        <Input defaultValue={session.user.email ?? ""} disabled />
+                        <p className="text-xs text-muted-foreground">این شناسه کاربری شماست و قابل تغییر نیست.</p>
                     </div>
                     <div className="grid gap-2">
                         <Label>نام نمایشی</Label>
