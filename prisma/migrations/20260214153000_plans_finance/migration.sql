@@ -82,6 +82,47 @@ UPDATE "Plan" SET "featuresJson" = COALESCE("featuresJson", "features", '{}'::js
 UPDATE "Plan" SET "quotasJson" = COALESCE("quotasJson", "limits", '{}'::jsonb);
 UPDATE "Plan" SET "maxChildren" = COALESCE("maxChildren", 1);
 
+-- Ensure legacy NOT NULL columns have defaults to avoid insert failures
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name = 'Plan' AND column_name = 'name'
+  ) THEN
+    EXECUTE 'ALTER TABLE "Plan" ALTER COLUMN "name" SET DEFAULT ''Plan''';
+  END IF;
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name = 'Plan' AND column_name = 'description'
+  ) THEN
+    EXECUTE 'ALTER TABLE "Plan" ALTER COLUMN "description" SET DEFAULT ''''';
+  END IF;
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name = 'Plan' AND column_name = 'priceMonthly'
+  ) THEN
+    EXECUTE 'ALTER TABLE "Plan" ALTER COLUMN "priceMonthly" SET DEFAULT 0';
+  END IF;
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name = 'Plan' AND column_name = 'priceYearly'
+  ) THEN
+    EXECUTE 'ALTER TABLE "Plan" ALTER COLUMN "priceYearly" SET DEFAULT 0';
+  END IF;
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name = 'Plan' AND column_name = 'limits'
+  ) THEN
+    EXECUTE 'ALTER TABLE "Plan" ALTER COLUMN "limits" SET DEFAULT ''{}''::jsonb';
+  END IF;
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name = 'Plan' AND column_name = 'features'
+  ) THEN
+    EXECUTE 'ALTER TABLE "Plan" ALTER COLUMN "features" SET DEFAULT ''{}''::jsonb';
+  END IF;
+END$$;
+
 ALTER TABLE "Plan" ALTER COLUMN "nameFa" SET NOT NULL;
 ALTER TABLE "Plan" ALTER COLUMN "priceMonthlyToman" SET NOT NULL;
 ALTER TABLE "Plan" ALTER COLUMN "maxChildren" SET NOT NULL;
