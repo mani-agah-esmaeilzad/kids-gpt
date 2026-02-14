@@ -27,9 +27,20 @@ END$$;
 
 -- ChildProfile updates (remove PIN, add avatarKey)
 ALTER TABLE "ChildProfile" ADD COLUMN IF NOT EXISTS "avatarKey" TEXT;
-UPDATE "ChildProfile"
-SET "avatarKey" = COALESCE("avatar", 'avatar-1')
-WHERE "avatarKey" IS NULL;
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1
+    FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name = 'ChildProfile'
+      AND column_name = 'avatar'
+  ) THEN
+    EXECUTE 'UPDATE "ChildProfile" SET "avatarKey" = COALESCE("avatar", ''avatar-1'') WHERE "avatarKey" IS NULL';
+  ELSE
+    EXECUTE 'UPDATE "ChildProfile" SET "avatarKey" = COALESCE("avatarKey", ''avatar-1'') WHERE "avatarKey" IS NULL';
+  END IF;
+END$$;
 ALTER TABLE "ChildProfile" ALTER COLUMN "avatarKey" SET NOT NULL;
 ALTER TABLE "ChildProfile" DROP COLUMN IF EXISTS "pinHash";
 ALTER TABLE "ChildProfile" DROP COLUMN IF EXISTS "avatar";
