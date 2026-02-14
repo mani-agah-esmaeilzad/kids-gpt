@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { MascotHeader } from "@/components/shared/mascot-header";
 import { ChatMessage } from "@/components/shared/chat-message";
 import { ChatComposer } from "@/components/shared/chat-composer";
 import { SuggestionChips } from "@/components/shared/suggestion-chips";
@@ -17,6 +16,10 @@ export type ChildChatProps = {
     ageGroup: string;
     avatarKey: string;
   };
+  features?: {
+    smartStory?: boolean;
+    priority?: boolean;
+  };
 };
 
 type Message = {
@@ -24,7 +27,7 @@ type Message = {
   content: string;
 };
 
-export function ChildChat({ child }: ChildChatProps) {
+export function ChildChat({ child, features }: ChildChatProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(false);
   const [conversationId, setConversationId] = useState<string | null>(null);
@@ -144,6 +147,7 @@ export function ChildChat({ child }: ChildChatProps) {
     switch (action) {
       case "explain-simple": prompt = "لطفاً همین رو ساده‌تر توضیح بده."; break;
       case "give-example": prompt = "یه مثال بزن که بهتر بفهمم."; break;
+      case "smart-story": prompt = "یه داستان کوتاه و بامزه برام بساز."; break;
       case "read-aloud":
         // In a real app we would trigger TTS
         alert("این قابلیت هنوز فعال نشده!");
@@ -156,6 +160,11 @@ export function ChildChat({ child }: ChildChatProps) {
 
   return (
     <div className="flex flex-col h-full md:h-[85vh] w-full max-w-5xl mx-auto relative z-10 bg-white/30 backdrop-blur-sm md:bg-white/50 md:rounded-3xl md:shadow-sm md:border md:border-white/50 overflow-hidden">
+      {features?.priority && (
+        <div className="absolute top-4 left-4 z-20 rounded-full bg-emerald-500 px-3 py-1 text-xs font-semibold text-white shadow-soft">
+          اولویت‌دار
+        </div>
+      )}
 
       <ScrollArea className="flex-1 px-4 md:px-0">
         <div className="space-y-6 pb-4 pt-4">
@@ -172,6 +181,15 @@ export function ChildChat({ child }: ChildChatProps) {
               <SuggestionChips
                 onSelect={handleSubmit}
                 className="w-full max-w-2xl justify-center"
+                suggestions={
+                  features?.smartStory
+                    ? [
+                        { label: "داستان بساز", value: "یه داستان کوتاه و بامزه برام بساز", icon: null },
+                        { label: "علمی بگو", value: "یه نکته علمی ساده بگو", icon: null },
+                        { label: "معما", value: "یه معما بگو", icon: null }
+                      ]
+                    : undefined
+                }
               />
             </div>
           )}
@@ -215,6 +233,9 @@ export function ChildChat({ child }: ChildChatProps) {
                 { label: "ادامه بده", value: "ادامه بده", icon: null },
                 { label: "جالبه!", value: "چه جالب! باز هم بگو", icon: null },
                 { label: "یه سوال دیگه", value: "یه سوال دیگه دارم", icon: null },
+                ...(features?.smartStory
+                  ? [{ label: "داستان بساز", value: "یه داستان کوتاه و بامزه بساز", icon: null }]
+                  : [])
               ]}
             />
           </div>

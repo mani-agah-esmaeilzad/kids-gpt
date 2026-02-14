@@ -6,12 +6,16 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { AlertTriangle, CheckCircle, Clock } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 export default async function ReportsPage() {
   const session = await getServerAuthSession();
   const parent = await prisma.parentProfile.findFirst({
-    where: { userId: session?.user?.id }
+    where: { userId: session?.user?.id },
+    include: { subscriptions: { include: { plan: true } } }
   });
+  if (!parent) return <div>پروفایل یافت نشد.</div>;
+  const features = (parent?.subscriptions?.[0]?.plan?.featuresJson as any) ?? {};
 
   const days = Array.from({ length: 7 }).map((_, idx) => subDays(new Date(), 6 - idx));
   // Mock data for now if database is empty or logic is complex to setup in test
@@ -23,8 +27,8 @@ export default async function ReportsPage() {
   const chartData = days.map((day) => {
     const dayKey = format(day, "yyyy-MM-dd");
     const entries = ledger.filter((entry) => format(entry.date, "yyyy-MM-dd") === dayKey);
-    const messages = entries.reduce((sum, entry) => sum + entry.messages, 0);
-    const tokens = entries.reduce((sum, entry) => sum + entry.tokens, 0);
+    const messages = entries.reduce((sum, entry) => sum + entry.messagesCount, 0);
+    const tokens = entries.reduce((sum, entry) => sum + entry.totalTokens, 0);
     // Use Persian Date formatted if possible, but keeping simple for now
     return { label: format(day, "MM/dd"), messages, tokens };
   });
@@ -40,6 +44,11 @@ export default async function ReportsPage() {
       <div>
         <h1 className="text-2xl font-bold tracking-tight">گزارشات و ایمنی</h1>
         <p className="text-muted-foreground">بررسی فعالیت‌ها و وضعیت ایمنی کودکان</p>
+        {features.pdfReport && (
+          <div className="mt-3">
+            <Button variant="outline">دانلود گزارش PDF</Button>
+          </div>
+        )}
       </div>
 
       <div className="grid gap-6 lg:grid-cols-2">

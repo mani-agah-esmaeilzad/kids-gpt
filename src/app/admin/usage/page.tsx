@@ -3,10 +3,23 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
 export default async function AdminUsagePage() {
-  const [ledger, perModel] = await Promise.all([
+  const [ledger, perModel, topParents] = await Promise.all([
     prisma.usageLedger.findMany({ orderBy: { date: "desc" }, take: 20 }),
-    prisma.usageLedger.groupBy({ by: ["model"], _sum: { tokens: true } })
+    prisma.usageLedger.groupBy({ by: ["modelUsed"], _sum: { totalTokens: true, estimatedTokenCostToman: true } }),
+    prisma.usageLedger.groupBy({
+      by: ["parentId"],
+      _sum: { totalTokens: true },
+      orderBy: { _sum: { totalTokens: "desc" } },
+      take: 5
+    })
   ]);
+
+  const parentIds = topParents.map((row) => row.parentId);
+  const parents = await prisma.parentProfile.findMany({
+    where: { id: { in: parentIds } },
+    include: { user: true }
+  });
+  const parentMap = new Map(parents.map((parent) => [parent.id, parent.user.email]));
 
   return (
     <div className="space-y-6">
@@ -22,15 +35,17 @@ export default async function AdminUsagePage() {
                 <TableHead>پیام</TableHead>
                 <TableHead>توکن</TableHead>
                 <TableHead>مدل</TableHead>
+                <TableHead>هزینه (تومان)</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {ledger.map((entry) => (
                 <TableRow key={entry.id}>
                   <TableCell>{entry.date.toISOString().slice(0, 10)}</TableCell>
-                  <TableCell>{entry.messages}</TableCell>
-                  <TableCell>{entry.tokens}</TableCell>
-                  <TableCell>{entry.model}</TableCell>
+                  <TableCell>{entry.messagesCount}</TableCell>
+                  <TableCell>{entry.totalTokens}</TableCell>
+                  <TableCell>{entry.modelUsed ?? "نامشخص"}</TableCell>
+                  <TableCell>{entry.estimatedTokenCostToman.toLocaleString()}</TableCell>
                 </TableRow>
               ))}
             </TableBody>
@@ -43,9 +58,22 @@ export default async function AdminUsagePage() {
         </CardHeader>
         <CardContent className="space-y-2 text-sm text-muted-foreground">
           {perModel.map((row) => (
-            <div key={row.model ?? "unknown"} className="flex items-center justify-between">
-              <span>{row.model ?? "نامشخص"}</span>
-              <span>{row._sum.tokens ?? 0} توکن</span>
+            <div key={row.modelUsed ?? "unknown"} className="flex items-center justify-between">
+              <span>{row.modelUsed ?? "نامشخص"}</span>
+              <span>{row._sum.totalTokens ?? 0} توکن</span>
+            </div>
+          ))}
+        </CardContent>
+      </Card>
+      <Card className="border-0 bg-card">
+        <CardHeader>
+          <CardTitle>کاربران پرمصرف</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-2 text-sm text-muted-foreground">
+          {topParents.map((row) => (
+            <div key={row.parentId} className="flex items-center justify-between">
+              <span>{parentMap.get(row.parentId) ?? row.parentId}</span>
+              <span>{row._sum.totalTokens ?? 0} توکن</span>
             </div>
           ))}
         </CardContent>

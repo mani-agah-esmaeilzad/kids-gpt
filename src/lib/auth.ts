@@ -6,6 +6,7 @@ import { prisma } from "@/lib/db";
 import { UserRole } from "@prisma/client";
 import { getServerSession } from "next-auth/next";
 import { rateLimit } from "@/lib/rate-limit";
+import { logEvent } from "@/lib/logger";
 
 const credentialsSchema = z.object({
   email: z.string().email(),
@@ -22,15 +23,24 @@ export const authOptions: NextAuthOptions = {
       },
       async authorize(credentials, req) {
         const ip = req?.headers?.["x-forwarded-for"] ?? "auth";
-        const rate = await rateLimit(`auth:${ip}`, 8, 60);
+        const config = await prisma.appConfig.findUnique({ where: { key: "rate.limits" } });
+        const ipLimit = Number((config?.value as any)?.ipAuthRPM ?? 8);
+        const rate = await rateLimit(`auth:${ip}`, ipLimit, 60);
         if (!rate.allowed) return null;
         const parsed = credentialsSchema.safeParse(credentials);
         if (!parsed.success) return null;
         const { email, password } = parsed.data;
         const user = await prisma.user.findUnique({ where: { email } });
-        if (!user) return null;
+        if (!user) {
+          await logEvent("auth.fail", { message: "user_not_found", userId: undefined, requestId: String(ip) }, "WARN");
+          return null;
+        }
         const valid = await bcrypt.compare(password, user.passwordHash);
-        if (!valid) return null;
+        if (!valid) {
+          await logEvent("auth.fail", { userId: user.id, requestId: String(ip), message: "invalid_password" }, "WARN");
+          return null;
+        }
+        await logEvent("auth.success", { userId: user.id, requestId: String(ip) });
         return {
           id: user.id,
           email: user.email,

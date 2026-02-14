@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
+import { getServerAuthSession } from "@/lib/auth";
 
 const schema = z.object({
   defaultModel: z.string().min(2),
@@ -16,7 +17,8 @@ const schema = z.object({
   prompt13_15: z.string().min(2),
   keywordBlocklist: z.string().optional(),
   announcement: z.string().optional(),
-  featureFlags: z.string().optional()
+  featureFlags: z.string().optional(),
+  rateConfig: z.string().optional()
 });
 
 async function updateConfig(formData: FormData) {
@@ -32,7 +34,8 @@ async function updateConfig(formData: FormData) {
     prompt13_15: String(formData.get("prompt13_15") ?? ""),
     keywordBlocklist: String(formData.get("keywordBlocklist") ?? ""),
     announcement: String(formData.get("announcement") ?? ""),
-    featureFlags: String(formData.get("featureFlags") ?? "{}")
+    featureFlags: String(formData.get("featureFlags") ?? "{}"),
+    rateConfig: String(formData.get("rateConfig") ?? "{}")
   };
   const parsed = schema.safeParse(data);
   if (!parsed.success) throw new Error("Invalid config");
@@ -115,6 +118,62 @@ async function updateConfig(formData: FormData) {
     update: { value: flags },
     create: { key: "app.flags", value: flags }
   });
+
+  let rateConfig = {};
+  try {
+    rateConfig = JSON.parse(parsed.data.rateConfig || "{}");
+  } catch {
+    rateConfig = {};
+  }
+
+  await prisma.appConfig.upsert({
+    where: { key: "rate.limits" },
+    update: { value: rateConfig },
+    create: { key: "rate.limits", value: rateConfig }
+  });
+
+  const session = await getServerAuthSession();
+  if (session?.user?.id) {
+    await prisma.auditLog.create({
+      data: {
+        actorUserId: session.user.id,
+        action: "config.update",
+        metadata: { keys: ["ai.models", "policy.prompts", "safety.keywords", "app.announcement", "app.flags", "rate.limits"] }
+      }
+    });
+  }
+}
+
+async function upsertModelPricing(formData: FormData) {
+  "use server";
+  const modelName = String(formData.get("modelName") ?? "");
+  const inputCost = Number(formData.get("inputCostPer1M") ?? "0");
+  const outputCost = Number(formData.get("outputCostPer1M") ?? "0");
+  await prisma.modelPricing.upsert({
+    where: { modelName },
+    update: {
+      inputCostPer1MTokensToman: inputCost,
+      outputCostPer1MTokensToman: outputCost,
+      isActive: true
+    },
+    create: {
+      modelName,
+      inputCostPer1MTokensToman: inputCost,
+      outputCostPer1MTokensToman: outputCost,
+      isActive: true
+    }
+  });
+
+  const session = await getServerAuthSession();
+  if (session?.user?.id) {
+    await prisma.auditLog.create({
+      data: {
+        actorUserId: session.user.id,
+        action: "model_pricing.upsert",
+        metadata: { modelName }
+      }
+    });
+  }
 }
 
 export default async function AdminConfigPage() {
@@ -138,14 +197,22 @@ export default async function AdminConfigPage() {
     where: { key: "app.flags" }
   });
   const flagsValue = flagsConfig?.value ?? {};
+  const rateConfig = await prisma.appConfig.findUnique({
+    where: { key: "rate.limits" }
+  });
+  const rateValue = rateConfig?.value ?? {};
+  const modelPricing = await prisma.modelPricing.findMany({
+    orderBy: { modelName: "asc" }
+  });
 
   return (
-    <Card className="border-0 bg-card">
-      <CardHeader>
-        <CardTitle>تنظیمات سیستم</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <form action={updateConfig} className="grid gap-4 lg:grid-cols-2">
+    <div className="space-y-6">
+      <Card className="border-0 bg-card">
+        <CardHeader>
+          <CardTitle>تنظیمات سیستم</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <form action={updateConfig} className="grid gap-4 lg:grid-cols-2">
           <div className="space-y-2">
             <Label>مدل پیش‌فرض</Label>
             <Input name="defaultModel" defaultValue={value.defaultModel ?? "gpt-4o-mini"} />
@@ -189,15 +256,56 @@ export default async function AdminConfigPage() {
             <Label>اعلان عمومی</Label>
             <Input name="announcement" defaultValue={announcementValue.text ?? ""} />
           </div>
-          <div className="space-y-2 lg:col-span-2">
-            <Label>Feature Flags JSON</Label>
-            <Input name="featureFlags" defaultValue={JSON.stringify(flagsValue)} />
+            <div className="space-y-2 lg:col-span-2">
+              <Label>Feature Flags JSON</Label>
+              <Input name="featureFlags" defaultValue={JSON.stringify(flagsValue)} />
+            </div>
+            <div className="space-y-2 lg:col-span-2">
+              <Label>تنظیمات Rate Limit JSON</Label>
+              <Input name="rateConfig" defaultValue={JSON.stringify(rateValue)} />
+            </div>
+            <div className="lg:col-span-2">
+              <Button className="w-full" type="submit">ذخیره تنظیمات</Button>
+            </div>
+          </form>
+        </CardContent>
+      </Card>
+
+      <Card className="border-0 bg-card">
+        <CardHeader>
+          <CardTitle>قیمت مدل‌ها</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid gap-2 text-sm text-muted-foreground">
+            {modelPricing.map((model) => (
+              <div key={model.id} className="flex items-center justify-between rounded-xl border px-3 py-2">
+                <span>{model.modelName}</span>
+                <span>
+                  ورودی {model.inputCostPer1MTokensToman.toLocaleString()} | خروجی{" "}
+                  {model.outputCostPer1MTokensToman.toLocaleString()}
+                </span>
+              </div>
+            ))}
           </div>
-          <div className="lg:col-span-2">
-            <Button className="w-full" type="submit">ذخیره تنظیمات</Button>
-          </div>
-        </form>
-      </CardContent>
-    </Card>
+          <form action={upsertModelPricing} className="grid gap-3 lg:grid-cols-3">
+            <div className="space-y-2">
+              <Label>نام مدل</Label>
+              <Input name="modelName" required />
+            </div>
+            <div className="space-y-2">
+              <Label>هزینه ورودی (۱M توکن)</Label>
+              <Input name="inputCostPer1M" required />
+            </div>
+            <div className="space-y-2">
+              <Label>هزینه خروجی (۱M توکن)</Label>
+              <Input name="outputCostPer1M" required />
+            </div>
+            <div className="lg:col-span-3">
+              <Button className="w-full" type="submit">ثبت/به‌روزرسانی مدل</Button>
+            </div>
+          </form>
+        </CardContent>
+      </Card>
+    </div>
   );
 }

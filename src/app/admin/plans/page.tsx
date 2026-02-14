@@ -6,51 +6,63 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
+import { getServerAuthSession } from "@/lib/auth";
 
 const schema = z.object({
-  name: z.string().min(2),
-  description: z.string().min(2),
-  priceMonthly: z.string(),
-  priceYearly: z.string(),
-  limits: z.string(),
-  features: z.string()
+  key: z.string().min(2),
+  nameFa: z.string().min(2),
+  priceMonthlyToman: z.string(),
+  maxChildren: z.string(),
+  quotasJson: z.string(),
+  featuresJson: z.string()
 });
 
 async function createPlan(formData: FormData) {
   "use server";
   const data = {
-    name: String(formData.get("name") ?? ""),
-    description: String(formData.get("description") ?? ""),
-    priceMonthly: String(formData.get("priceMonthly") ?? "0"),
-    priceYearly: String(formData.get("priceYearly") ?? "0"),
-    limits: String(formData.get("limits") ?? "{}"),
-    features: String(formData.get("features") ?? "{}")
+    key: String(formData.get("key") ?? ""),
+    nameFa: String(formData.get("nameFa") ?? ""),
+    priceMonthlyToman: String(formData.get("priceMonthlyToman") ?? "0"),
+    maxChildren: String(formData.get("maxChildren") ?? "1"),
+    quotasJson: String(formData.get("quotasJson") ?? "{}"),
+    featuresJson: String(formData.get("featuresJson") ?? "{}")
   };
   const parsed = schema.safeParse(data);
   if (!parsed.success) throw new Error("Invalid data");
-  let limits = {};
+  let quotas = {};
   let features = {};
   try {
-    limits = JSON.parse(parsed.data.limits);
+    quotas = JSON.parse(parsed.data.quotasJson);
   } catch {
-    limits = {};
+    quotas = {};
   }
   try {
-    features = JSON.parse(parsed.data.features);
+    features = JSON.parse(parsed.data.featuresJson);
   } catch {
     features = {};
   }
   await prisma.plan.create({
     data: {
-      name: parsed.data.name,
-      description: parsed.data.description,
-      priceMonthly: Number(parsed.data.priceMonthly),
-      priceYearly: Number(parsed.data.priceYearly),
-      limits,
-      features,
+      key: parsed.data.key,
+      nameFa: parsed.data.nameFa,
+      priceMonthlyToman: Number(parsed.data.priceMonthlyToman),
+      maxChildren: Number(parsed.data.maxChildren),
+      quotasJson: quotas,
+      featuresJson: features,
       isActive: true
     }
   });
+
+  const session = await getServerAuthSession();
+  if (session?.user?.id) {
+    await prisma.auditLog.create({
+      data: {
+        actorUserId: session.user.id,
+        action: "plan.create",
+        metadata: { key: parsed.data.key, nameFa: parsed.data.nameFa }
+      }
+    });
+  }
 }
 
 export default async function AdminPlansPage() {
@@ -66,18 +78,20 @@ export default async function AdminPlansPage() {
           <Table>
             <TableHeader>
               <TableRow>
+                <TableHead>کلید</TableHead>
                 <TableHead>نام</TableHead>
-                <TableHead>ماهانه</TableHead>
-                <TableHead>سالانه</TableHead>
+                <TableHead>ماهانه (تومان)</TableHead>
+                <TableHead>حداکثر کودک</TableHead>
                 <TableHead>فعال</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {plans.map((plan) => (
                 <TableRow key={plan.id}>
-                  <TableCell>{plan.name}</TableCell>
-                  <TableCell>{plan.priceMonthly}</TableCell>
-                  <TableCell>{plan.priceYearly}</TableCell>
+                  <TableCell>{plan.key}</TableCell>
+                  <TableCell>{plan.nameFa}</TableCell>
+                  <TableCell>{plan.priceMonthlyToman.toLocaleString()}</TableCell>
+                  <TableCell>{plan.maxChildren}</TableCell>
                   <TableCell>{plan.isActive ? "بله" : "خیر"}</TableCell>
                 </TableRow>
               ))}
@@ -92,30 +106,30 @@ export default async function AdminPlansPage() {
         <CardContent>
           <form action={createPlan} className="space-y-3">
             <div className="space-y-2">
-              <Label>نام</Label>
-              <Input name="name" required />
+              <Label>کلید</Label>
+              <Input name="key" required />
             </div>
             <div className="space-y-2">
-              <Label>توضیح</Label>
-              <Input name="description" required />
+              <Label>نام فارسی</Label>
+              <Input name="nameFa" required />
             </div>
             <div className="grid gap-3 lg:grid-cols-2">
               <div className="space-y-2">
-                <Label>قیمت ماهانه</Label>
-                <Input name="priceMonthly" required />
+                <Label>قیمت ماهانه (تومان)</Label>
+                <Input name="priceMonthlyToman" required />
               </div>
               <div className="space-y-2">
-                <Label>قیمت سالانه</Label>
-                <Input name="priceYearly" required />
+                <Label>حداکثر کودک</Label>
+                <Input name="maxChildren" required />
               </div>
             </div>
             <div className="space-y-2">
-              <Label>Limits JSON</Label>
-              <Textarea name="limits" defaultValue="{}" />
+              <Label>Quotas JSON</Label>
+              <Textarea name="quotasJson" defaultValue="{}" />
             </div>
             <div className="space-y-2">
               <Label>Features JSON</Label>
-              <Textarea name="features" defaultValue="{}" />
+              <Textarea name="featuresJson" defaultValue="{}" />
             </div>
             <Button className="w-full" type="submit">ثبت</Button>
           </form>

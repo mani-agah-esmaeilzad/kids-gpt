@@ -1,13 +1,6 @@
 import type { Metadata } from "next";
-import { Vazirmatn } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider } from "@/components/theme-provider";
-
-const vazir = Vazirmatn({
-  subsets: ["arabic"],
-  variable: "--font-sans",
-  display: "swap"
-});
 
 export const metadata: Metadata = {
   title: "GPTKids | چت‌بات امن کودکان",
@@ -21,7 +14,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="fa" dir="rtl" className={vazir.variable} suppressHydrationWarning>
+    <html lang="fa" dir="rtl" suppressHydrationWarning>
       <body className="min-h-screen font-sans">
         <ThemeProvider attribute="class" defaultTheme="light" enableSystem>
           {children}

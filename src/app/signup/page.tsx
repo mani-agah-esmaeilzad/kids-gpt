@@ -46,16 +46,6 @@ async function createParent(formData: FormData) {
     },
     include: { parentProfile: true }
   });
-  const freePlan = await prisma.plan.findFirst({ where: { name: "رایگان" } });
-  if (freePlan && user.parentProfile) {
-    await prisma.subscription.create({
-      data: {
-        parentId: user.parentProfile.id,
-        planId: freePlan.id,
-        status: "ACTIVE"
-      }
-    });
-  }
   redirect("/login?registered=1");
 }
 
@@ -65,7 +55,7 @@ export default function SignupPage() {
       <div className="mx-auto max-w-md">
         <Card className="border-0 bg-white/90 shadow-soft">
           <CardHeader>
-            <CardTitle>شروع رایگان با GPTKids</CardTitle>
+            <CardTitle>ساخت حساب والدین</CardTitle>
           </CardHeader>
           <CardContent>
             <form action={createParent} className="space-y-4">

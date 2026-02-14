@@ -11,7 +11,10 @@ import {
   Sliders,
   Activity,
   ListChecks,
-  FileText
+  FileText,
+  DollarSign,
+  ShieldCheck,
+  Receipt
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -19,10 +22,15 @@ const items = [
   { href: "/admin", label: "نمای کلی", icon: LayoutDashboard },
   { href: "/admin/users", label: "کاربران", icon: Users },
   { href: "/admin/plans", label: "پلن‌ها", icon: CreditCard },
+  { href: "/admin/subscriptions", label: "اشتراک‌ها", icon: Receipt },
+  { href: "/admin/payments", label: "پرداخت‌ها", icon: DollarSign },
   { href: "/admin/coupons", label: "کوپن‌ها", icon: TicketPercent },
-  { href: "/admin/usage", label: "مصرف و هزینه", icon: Activity },
+  { href: "/admin/usage", label: "مصرف و توکن", icon: Activity },
+  { href: "/admin/costs", label: "هزینه‌ها", icon: DollarSign },
   { href: "/admin/safety", label: "ایمنی", icon: ShieldAlert },
+  { href: "/admin/limits", label: "Rate Limits", icon: ShieldCheck },
   { href: "/admin/config", label: "تنظیمات", icon: Sliders },
+  { href: "/admin/logs", label: "لاگ سیستم", icon: ListChecks },
   { href: "/admin/audit", label: "لاگ‌ها", icon: ListChecks },
   { href: "/admin/exports", label: "خروجی CSV", icon: FileText }
 ];

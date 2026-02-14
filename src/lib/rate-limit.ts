@@ -30,3 +30,23 @@ export async function rateLimit(
     return { allowed: true, remaining: limit, resetIn: windowSeconds };
   }
 }
+
+export async function acquireConcurrencySlot(
+  key: string,
+  limit: number,
+  ttlSeconds: number
+) {
+  try {
+    const current = await redis.incr(key);
+    if (current === 1) {
+      await redis.expire(key, ttlSeconds);
+    }
+    if (current > limit) {
+      await redis.decr(key);
+      return { allowed: false, current };
+    }
+    return { allowed: true, current };
+  } catch {
+    return { allowed: true, current: 0 };
+  }
+}

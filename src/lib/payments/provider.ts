@@ -6,11 +6,11 @@ export type PaymentIntentResult = {
 export interface PaymentProvider {
   name: string;
   createCheckout(input: {
+    userId: string;
     subscriptionId: string;
-    amount: number;
-    currency: string;
+    amountToman: number;
     customerEmail: string;
   }): Promise<PaymentIntentResult>;
   handleWebhook?(payload: string, signature: string | null): Promise<void>;
-  activateManual?(input: { subscriptionId: string; reference: string }): Promise<void>;
+  activateManual?(input: { subscriptionId: string; userId: string; reference: string }): Promise<void>;
 }

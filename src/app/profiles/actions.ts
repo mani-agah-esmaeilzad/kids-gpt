@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { getServerAuthSession } from "@/lib/auth";
-import { getActiveSubscription, type PlanLimits } from "@/lib/quotas";
+import { getActiveSubscription } from "@/lib/quotas";
 import { revalidatePath } from "next/cache";
 
 const schema = z.object({
@@ -40,8 +40,7 @@ export async function createProfile(formData: FormData) {
         throw new Error("پلن فعال ندارید.");
     }
 
-    const limits = (subscription?.plan?.limits ?? {}) as PlanLimits;
-    if (limits.childrenLimit && parent.children.length >= limits.childrenLimit) {
+    if (subscription.plan.maxChildren && parent.children.length >= subscription.plan.maxChildren) {
         throw new Error("سقف تعداد پروفایل این پلن پر شده است.");
     }
 

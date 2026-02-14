@@ -1,5 +1,5 @@
 import bcrypt from "bcryptjs";
-import { PrismaClient, UserRole, AgeGroup, SubscriptionStatus } from "@prisma/client";
+import { PrismaClient, UserRole, AgeGroup, SubscriptionStatus, CostCategory } from "@prisma/client";
 
 const prisma = new PrismaClient();
 
@@ -72,98 +72,138 @@ async function main() {
 
   const plans = [
     {
-      name: "رایگان",
-      description: "برای شروع امن و رایگان",
-      priceMonthly: 0,
-      priceYearly: 0,
-      limits: {
-        messagesPerDay: 20,
-        tokensPerMonth: 10000,
-        childrenLimit: 1
+      key: "base_monthly",
+      nameFa: "پلن پایه",
+      priceMonthlyToman: 249000,
+      maxChildren: 1,
+      quotasJson: {
+        dailyMessagesPerChild: 60,
+        dailyTokensPerChild: 25000,
+        monthlyTokenCap: 600000,
+        rateLimits: {
+          parentRPM: 30,
+          childRPM: 10,
+          childConcurrency: 2,
+          ipAuthRPM: 8
+        }
       },
-      features: {
-        reports: "basic",
-        scheduling: false
+      featuresJson: {
+        progressReport: false,
+        smartStory: false,
+        pdfReport: false,
+        priority: false
       }
     },
     {
-      name: "استاندارد",
-      description: "برای خانواده‌های تک فرزند با گزارش هفتگی",
-      priceMonthly: 1500000,
-      priceYearly: 15000000,
-      limits: {
-        messagesPerDay: 200,
-        tokensPerMonth: 200000,
-        childrenLimit: 1
+      key: "pro_monthly",
+      nameFa: "پلن حرفه‌ای",
+      priceMonthlyToman: 399000,
+      maxChildren: 3,
+      quotasJson: {
+        dailyMessagesPerChild: 200,
+        dailyTokensPerChild: 80000,
+        monthlyTokenCap: 2000000,
+        rateLimits: {
+          parentRPM: 60,
+          childRPM: 20,
+          childConcurrency: 4,
+          ipAuthRPM: 12
+        }
       },
-      features: {
-        reports: "weekly",
-        scheduling: false
+      featuresJson: {
+        progressReport: true,
+        smartStory: true,
+        pdfReport: false,
+        priority: false
       }
     },
     {
-      name: "خانوادگی",
-      description: "برای خانواده‌های پر جمعیت با گزارش روزانه",
-      priceMonthly: 3500000,
-      priceYearly: 35000000,
-      limits: {
-        messagesPerDayPerChild: 300,
-        tokensPerMonth: 500000,
-        childrenLimit: 4
+      key: "family_plus_monthly",
+      nameFa: "پلن خانواده پلاس",
+      priceMonthlyToman: 599000,
+      maxChildren: 5,
+      quotasJson: {
+        dailyMessagesPerChild: 300,
+        dailyTokensShared: 200000,
+        monthlyTokenCap: 4000000,
+        rateLimits: {
+          parentRPM: 90,
+          childRPM: 30,
+          childConcurrency: 6,
+          ipAuthRPM: 16
+        }
       },
-      features: {
-        reports: "daily",
-        scheduling: true
-      }
-    },
-    {
-      name: "مدرسه",
-      description: "نسخه سازمانی با سهمیه قابل تنظیم",
-      priceMonthly: 0,
-      priceYearly: 0,
-      limits: {
-        seats: 0,
-        configurable: true
-      },
-      features: {
-        reports: "custom",
-        scheduling: true
+      featuresJson: {
+        progressReport: true,
+        smartStory: true,
+        pdfReport: true,
+        priority: true
       }
     }
   ];
 
   for (const plan of plans) {
     await prisma.plan.upsert({
-      where: { name: plan.name },
+      where: { key: plan.key },
       update: {
-        description: plan.description,
-        priceMonthly: plan.priceMonthly,
-        priceYearly: plan.priceYearly,
-        limits: plan.limits,
-        features: plan.features,
+        nameFa: plan.nameFa,
+        priceMonthlyToman: plan.priceMonthlyToman,
+        maxChildren: plan.maxChildren,
+        quotasJson: plan.quotasJson,
+        featuresJson: plan.featuresJson,
         isActive: true
       },
       create: {
-        name: plan.name,
-        description: plan.description,
-        priceMonthly: plan.priceMonthly,
-        priceYearly: plan.priceYearly,
-        limits: plan.limits,
-        features: plan.features,
+        key: plan.key,
+        nameFa: plan.nameFa,
+        priceMonthlyToman: plan.priceMonthlyToman,
+        maxChildren: plan.maxChildren,
+        quotasJson: plan.quotasJson,
+        featuresJson: plan.featuresJson,
         isActive: true
       }
     });
   }
 
-  const freePlan = await prisma.plan.findFirst({ where: { name: "رایگان" } });
-  if (freePlan) {
-    await prisma.subscription.upsert({
+  const basePlan = await prisma.plan.findFirst({ where: { key: "base_monthly" } });
+  if (basePlan) {
+    const subscription = await prisma.subscription.upsert({
       where: { parentId: parentProfile.id },
-      update: { planId: freePlan.id, status: SubscriptionStatus.ACTIVE },
+      update: {
+        planId: basePlan.id,
+        status: SubscriptionStatus.ACTIVE,
+        userId: parent.id
+      },
       create: {
+        userId: parent.id,
         parentId: parentProfile.id,
-        planId: freePlan.id,
-        status: SubscriptionStatus.ACTIVE
+        planId: basePlan.id,
+        status: SubscriptionStatus.ACTIVE,
+        startAt: new Date(),
+        renewAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+        provider: "manual",
+        providerRef: "seed"
+      }
+    });
+
+    await prisma.payment.create({
+      data: {
+        userId: parent.id,
+        subscriptionId: subscription.id,
+        amountToman: basePlan.priceMonthlyToman,
+        status: "PAID",
+        provider: "manual",
+        providerRef: "seed",
+        feeToman: 0
+      }
+    });
+
+    await prisma.revenueLedger.create({
+      data: {
+        userId: parent.id,
+        subscriptionId: subscription.id,
+        amountToman: basePlan.priceMonthlyToman,
+        notes: "Seed activation"
       }
     });
   }
@@ -237,6 +277,63 @@ async function main() {
     where: { key: "app.flags" },
     update: { value: { reportsV2: true, showMascot: true } },
     create: { key: "app.flags", value: { reportsV2: true, showMascot: true } }
+  });
+
+  await prisma.appConfig.upsert({
+    where: { key: "rate.limits" },
+    update: { value: { globalMultiplier: 1, emergencyThrottle: false, ipAuthRPM: 8 } },
+    create: { key: "rate.limits", value: { globalMultiplier: 1, emergencyThrottle: false, ipAuthRPM: 8 } }
+  });
+
+  await prisma.modelPricing.upsert({
+    where: { modelName: "gpt-4o-mini" },
+    update: {
+      inputCostPer1MTokensToman: 120000,
+      outputCostPer1MTokensToman: 180000,
+      isActive: true
+    },
+    create: {
+      modelName: "gpt-4o-mini",
+      inputCostPer1MTokensToman: 120000,
+      outputCostPer1MTokensToman: 180000,
+      isActive: true
+    }
+  });
+
+  await prisma.modelPricing.upsert({
+    where: { modelName: "gpt-4o" },
+    update: {
+      inputCostPer1MTokensToman: 240000,
+      outputCostPer1MTokensToman: 360000,
+      isActive: true
+    },
+    create: {
+      modelName: "gpt-4o",
+      inputCostPer1MTokensToman: 240000,
+      outputCostPer1MTokensToman: 360000,
+      isActive: true
+    }
+  });
+
+  await prisma.costLedger.createMany({
+    data: [
+      {
+        category: CostCategory.SERVER,
+        amountToman: 1800000,
+        notes: "سرور ماهانه"
+      },
+      {
+        category: CostCategory.MARKETING,
+        amountToman: 900000,
+        notes: "کمپین اینستاگرام"
+      },
+      {
+        category: CostCategory.PAYMENT,
+        amountToman: 120000,
+        notes: "کارمزد پرداخت"
+      }
+    ],
+    skipDuplicates: true
   });
 }
 

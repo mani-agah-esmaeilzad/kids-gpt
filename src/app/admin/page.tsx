@@ -1,39 +1,82 @@
 import { prisma } from "@/lib/db";
-import { format } from "date-fns";
+import { format, subDays, startOfDay } from "date-fns";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { UsageChart } from "@/components/usage-chart";
+import { FinancialChart } from "@/components/admin/financial-chart";
 import { Users, CreditCard, Activity, Box } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 async function getStats() {
-  const [activeSubs, usersCount, totalRevenue, usageData, recentUsers] = await Promise.all([
+  const [activeSubs, usersCount, revenueSum, tokenCostSum, costSum, usageData, revenueRows, costRows, recentUsers, dauCount, churnCount, planGroups] = await Promise.all([
     prisma.subscription.count({ where: { status: "ACTIVE" } }),
     prisma.user.count(),
-    prisma.payment.aggregate({ _sum: { amount: true } }),
+    prisma.revenueLedger.aggregate({ _sum: { amountToman: true } }),
+    prisma.usageLedger.aggregate({ _sum: { estimatedTokenCostToman: true } }),
+    prisma.costLedger.aggregate({ _sum: { amountToman: true } }),
     prisma.usageLedger.findMany({
       orderBy: { date: "asc" },
       take: 30,
-      select: { date: true, messages: true, tokens: true }
+      select: { date: true, messagesCount: true, totalTokens: true, estimatedTokenCostToman: true }
     }),
+    prisma.revenueLedger.findMany({ orderBy: { date: "asc" }, take: 30 }),
+    prisma.costLedger.findMany({ orderBy: { date: "asc" }, take: 30 }),
     prisma.user.findMany({
       orderBy: { createdAt: "desc" },
       take: 5,
       select: { id: true, email: true, createdAt: true }
-    })
+    }),
+    prisma.kidDeviceSession.count({
+      where: { lastSeenAt: { gte: startOfDay(new Date()) } }
+    }),
+    prisma.subscription.count({
+      where: { status: "CANCELED", updatedAt: { gte: subDays(new Date(), 30) } }
+    }),
+    prisma.subscription.groupBy({ by: ["planId"], _count: { planId: true } })
   ]);
 
-  return { activeSubs, usersCount, totalRevenue: totalRevenue._sum.amount ?? 0, usageData, recentUsers };
+  return {
+    activeSubs,
+    usersCount,
+    totalRevenue: revenueSum._sum.amountToman ?? 0,
+    tokenCost: tokenCostSum._sum.estimatedTokenCostToman ?? 0,
+    otherCosts: costSum._sum.amountToman ?? 0,
+    usageData,
+    revenueRows,
+    costRows,
+    recentUsers,
+    dauCount,
+    churnCount,
+    planGroups
+  };
 }
 
 export default async function AdminOverviewPage() {
-  const { activeSubs, usersCount, totalRevenue, usageData, recentUsers } = await getStats();
+  const { activeSubs, usersCount, totalRevenue, tokenCost, otherCosts, usageData, revenueRows, costRows, recentUsers, dauCount, churnCount, planGroups } = await getStats();
+  const plans = await prisma.plan.findMany();
+  const planDistribution = planGroups.map((group) => ({
+    name: plans.find((plan) => plan.id === group.planId)?.nameFa ?? group.planId,
+    count: group._count.planId
+  }));
 
   const chartData = usageData.map((entry) => ({
     label: format(entry.date, "MM/dd"),
-    messages: entry.messages,
-    tokens: entry.tokens
+    messages: entry.messagesCount,
+    tokens: entry.totalTokens
   }));
+
+  const financialData = chartData.map((item) => {
+    const revenue = revenueRows
+      .filter((row) => format(row.date, "MM/dd") === item.label)
+      .reduce((sum, row) => sum + row.amountToman, 0);
+    const otherCosts = costRows
+      .filter((row) => format(row.date, "MM/dd") === item.label)
+      .reduce((sum, row) => sum + row.amountToman, 0);
+    const tokenCosts = usageData
+      .filter((row) => format(row.date, "MM/dd") === item.label)
+      .reduce((sum, row) => sum + (row.estimatedTokenCostToman ?? 0), 0);
+    return { label: item.label, revenue, cost: otherCosts + tokenCosts };
+  });
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
@@ -60,10 +103,38 @@ export default async function AdminOverviewPage() {
           className="bg-white dark:bg-slate-950"
         />
         <StatsCard
+          title="DAU"
+          value={dauCount.toString()}
+          icon={<Users className="h-4 w-4 text-blue-500" />}
+          subtext="فعال امروز"
+          className="bg-white dark:bg-slate-950"
+        />
+        <StatsCard
+          title="Churn"
+          value={churnCount.toString()}
+          icon={<Activity className="h-4 w-4 text-rose-500" />}
+          subtext="۳۰ روز اخیر"
+          className="bg-white dark:bg-slate-950"
+        />
+        <StatsCard
           title="درآمد کل"
           value={`${totalRevenue.toLocaleString()} تومان`}
           icon={<Box className="h-4 w-4 text-blue-500" />}
-          subtext="از ابتدای سال"
+          subtext="جمع کل"
+          className="bg-white dark:bg-slate-950"
+        />
+        <StatsCard
+          title="هزینه توکن"
+          value={`${tokenCost.toLocaleString()} تومان`}
+          icon={<Activity className="h-4 w-4 text-orange-500" />}
+          subtext="جمع کل"
+          className="bg-white dark:bg-slate-950"
+        />
+        <StatsCard
+          title="هزینه‌های دیگر"
+          value={`${otherCosts.toLocaleString()} تومان`}
+          icon={<Activity className="h-4 w-4 text-rose-500" />}
+          subtext="سرور/پرداخت/مارکتینگ"
           className="bg-white dark:bg-slate-950"
         />
         <StatsCard
@@ -119,6 +190,30 @@ export default async function AdminOverviewPage() {
           </CardContent>
         </Card>
       </div>
+
+      <Card className="shadow-sm border-0 bg-white dark:bg-slate-950">
+        <CardHeader>
+          <CardTitle>درآمد در برابر هزینه</CardTitle>
+          <CardDescription>روند مالی ۳۰ روز گذشته</CardDescription>
+        </CardHeader>
+        <CardContent className="pl-2">
+          <FinancialChart data={financialData} />
+        </CardContent>
+      </Card>
+
+      <Card className="shadow-sm border-0 bg-white dark:bg-slate-950">
+        <CardHeader>
+          <CardTitle>توزیع پلن‌ها</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-2 text-sm text-muted-foreground">
+          {planDistribution.map((row) => (
+            <div key={row.name} className="flex items-center justify-between">
+              <span>{row.name}</span>
+              <span>{row.count}</span>
+            </div>
+          ))}
+        </CardContent>
+      </Card>
     </div>
   );
 }

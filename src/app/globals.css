@@ -1,9 +1,12 @@
+@import url("https://fonts.googleapis.com/css2?family=Vazirmatn:wght@100..900&display=swap");
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 @layer base {
   :root {
+    --font-sans: "Vazirmatn";
     /* Base - Slate 50/900 */
     --background: 210 40% 98%;
     --foreground: 222 47% 11%;

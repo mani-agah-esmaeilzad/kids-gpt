@@ -26,10 +26,9 @@ enum MessageRole {
 
 enum SubscriptionStatus {
   ACTIVE
-  TRIALING
   PAST_DUE
   CANCELED
-  INACTIVE
+  EXPIRED
 }
 
 enum IncidentType {
@@ -61,6 +60,19 @@ enum CouponDuration {
   FOREVER
 }
 
+enum CostCategory {
+  SERVER
+  PAYMENT
+  MARKETING
+  OTHER
+}
+
+enum LogSeverity {
+  INFO
+  WARN
+  ERROR
+}
+
 model User {
   id            String         @id @default(cuid())
   email         String         @unique
@@ -69,6 +81,11 @@ model User {
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt
   parentProfile ParentProfile?
+  subscriptions Subscription[]
+  payments      Payment[]
+  usageLedger   UsageLedger[]
+  revenues      RevenueLedger[]
+  logEvents     LogEvent[]
   accounts      Account[]
   sessions      Session[]
   auditLogs     AuditLog[]
@@ -102,6 +119,7 @@ model ChildProfile {
   usageLedger    UsageLedger[]
   incidents      SafetyIncident[]
   deviceSessions KidDeviceSession[]
+  logEvents      LogEvent[]
   createdAt      DateTime           @default(now())
   updatedAt      DateTime           @updatedAt
 
@@ -145,70 +163,150 @@ model Message {
 }
 
 model Plan {
-  id            String         @id @default(cuid())
-  name          String         @unique
-  description   String
-  priceMonthly  Int
-  priceYearly   Int
-  currency      String         @default("IRR")
-  limits        Json
-  features      Json
-  isActive      Boolean        @default(true)
-  createdAt     DateTime       @default(now())
-  updatedAt     DateTime       @updatedAt
-  subscriptions Subscription[]
+  id               String         @id @default(cuid())
+  key              String         @unique
+  nameFa           String
+  priceMonthlyToman Int
+  maxChildren      Int
+  featuresJson     Json           @default("{}")
+  quotasJson       Json           @default("{}")
+  isActive         Boolean        @default(true)
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+  subscriptions    Subscription[]
 }
 
 model Subscription {
-  id                 String             @id @default(cuid())
-  parentId           String
-  planId             String
-  status             SubscriptionStatus @default(INACTIVE)
-  currentPeriodStart DateTime           @default(now())
-  currentPeriodEnd   DateTime?
-  cancelAtPeriodEnd  Boolean            @default(false)
-  metadata           Json               @default("{}")
-  createdAt          DateTime           @default(now())
-  updatedAt          DateTime           @updatedAt
-  payments           Payment[]
+  id          String             @id @default(cuid())
+  userId      String
+  parentId    String
+  planId      String
+  status      SubscriptionStatus @default(ACTIVE)
+  startAt     DateTime           @default(now())
+  renewAt     DateTime?
+  endAt       DateTime?
+  provider    String?
+  providerRef String?
+  metadata    Json               @default("{}")
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+  payments    Payment[]
+  revenues    RevenueLedger[]
 
+  user   User          @relation(fields: [userId], references: [id], onDelete: Cascade)
   parent ParentProfile @relation(fields: [parentId], references: [id], onDelete: Cascade)
   plan   Plan          @relation(fields: [planId], references: [id], onDelete: Restrict)
 
   @@unique([parentId])
+  @@index([userId])
   @@index([status])
 }
 
 model Payment {
   id             String        @id @default(cuid())
-  subscriptionId String
-  provider       String
-  amount         Int
-  currency       String        @default("IRR")
+  userId         String
+  subscriptionId String?
+  amountToman    Int
   status         PaymentStatus @default(PENDING)
-  reference      String?
+  provider       String
+  providerRef    String?
+  feeToman       Int           @default(0)
   createdAt      DateTime      @default(now())
 
-  subscription Subscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+  user         User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  subscription Subscription?  @relation(fields: [subscriptionId], references: [id], onDelete: SetNull)
 }
 
 model UsageLedger {
-  id           String   @id @default(cuid())
-  parentId     String
-  childId      String?
-  date         DateTime @default(now())
-  messages     Int      @default(0)
-  tokens       Int      @default(0)
-  model        String?
-  costEstimate Float    @default(0)
-  outcome      String?
-  latencyMs    Int?
+  id                       String   @id @default(cuid())
+  userId                   String
+  parentId                 String
+  childId                  String?
+  date                     DateTime @default(now())
+  messagesCount            Int      @default(0)
+  inputTokens              Int      @default(0)
+  outputTokens             Int      @default(0)
+  totalTokens              Int      @default(0)
+  estimatedTokenCostToman  Int      @default(0)
+  modelUsed                String?
+  outcome                  String?
+  latencyMs                Int?
+  createdAt                DateTime @default(now())
 
+  user   User          @relation(fields: [userId], references: [id], onDelete: Cascade)
   parent ParentProfile @relation(fields: [parentId], references: [id], onDelete: Cascade)
   child  ChildProfile? @relation(fields: [childId], references: [id], onDelete: SetNull)
 
+  @@index([userId, date])
   @@index([parentId, date])
   @@index([childId, date])
+}
+
+model ModelPricing {
+  id                       String   @id @default(cuid())
+  modelName                String   @unique
+  inputCostPer1MTokensToman  Int
+  outputCostPer1MTokensToman Int
+  isActive                 Boolean  @default(true)
+  createdAt                DateTime @default(now())
+  updatedAt                DateTime @updatedAt
+}
+
+model CostLedger {
+  id         String       @id @default(cuid())
+  date       DateTime     @default(now())
+  category   CostCategory
+  amountToman Int
+  notes      String?
+  createdAt  DateTime     @default(now())
+
+  @@index([category, date])
+}
+
+model RevenueLedger {
+  id              String        @id @default(cuid())
+  date            DateTime      @default(now())
+  userId          String
+  subscriptionId  String?
+  amountToman     Int
+  notes           String?
+  createdAt       DateTime      @default(now())
+
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  subscription Subscription? @relation(fields: [subscriptionId], references: [id], onDelete: SetNull)
+
+  @@index([userId, date])
+}
+
+model FinancialSnapshot {
+  id                String   @id @default(cuid())
+  date              DateTime @unique
+  revenueToman      Int      @default(0)
+  tokenCostToman    Int      @default(0)
+  serverCostToman   Int      @default(0)
+  paymentCostToman  Int      @default(0)
+  marketingCostToman Int     @default(0)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+}
+
+model LogEvent {
+  id        String      @id @default(cuid())
+  eventType String
+  severity  LogSeverity @default(INFO)
+  message   String?
+  userId    String?
+  childId   String?
+  requestId String?
+  metadata  Json        @default("{}")
+  createdAt DateTime    @default(now())
+
+  user  User?         @relation(fields: [userId], references: [id], onDelete: SetNull)
+  child ChildProfile? @relation(fields: [childId], references: [id], onDelete: SetNull)
+
+  @@index([eventType, createdAt])
+  @@index([userId, createdAt])
+  @@index([childId, createdAt])
 }
 
 model SafetyIncident {

@@ -44,8 +44,10 @@ export function ProfilePicker({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ childId })
       });
-      // Redirect to kid dashboard
-      window.location.href = "/kid/dashboard";
+      if (isParentLoggedIn) {
+        await signOut({ redirect: false });
+      }
+      window.location.href = "/kid/chat";
     } catch (error) {
       console.error("Failed to select profile", error);
       setLoadingId(null);

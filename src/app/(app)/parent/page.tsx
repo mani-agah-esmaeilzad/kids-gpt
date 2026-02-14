@@ -32,8 +32,9 @@ export default async function ParentDashboard() {
     return { child, quota };
   }));
 
-  const activePlan = parent.subscriptions?.[0]?.plan?.name ?? "رایگان";
-  const planLimit = 50; // Example limit, should come from plan details
+  const activePlan = parent.subscriptions?.[0]?.plan?.nameFa ?? "بدون اشتراک";
+  const planQuotas = (parent.subscriptions?.[0]?.plan?.quotasJson as any) ?? {};
+  const planLimit = planQuotas.dailyMessagesPerChild ?? 1;
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
@@ -82,6 +83,11 @@ export default async function ParentDashboard() {
                       max={planLimit}
                       label="پیام‌های امروز"
                     />
+                    {quota.warnings?.length ? (
+                      <p className="text-xs font-semibold text-orange-600">
+                        نزدیک به سقف مصرف هستید.
+                      </p>
+                    ) : null}
                     <div className="flex justify-end">
                       <Button asChild size="sm" variant="outline">
                         <Link href="/profiles/manage">تنظیمات</Link>

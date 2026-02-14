@@ -7,15 +7,16 @@ vi.mock("@/lib/db", () => {
       subscription: {
         findFirst: vi.fn().mockResolvedValue({
           plan: {
-            limits: { messagesPerDay: 1, tokensPerMonth: 10 }
+            quotasJson: { dailyMessagesPerChild: 1, monthlyTokenCap: 10 }
           }
         })
       },
       usageLedger: {
         aggregate: vi
           .fn()
-          .mockResolvedValueOnce({ _sum: { messages: 1 } })
-          .mockResolvedValueOnce({ _sum: { tokens: 5 } })
+          .mockResolvedValueOnce({ _sum: { messagesCount: 1, totalTokens: 1 } })
+          .mockResolvedValueOnce({ _sum: { totalTokens: 2 } })
+          .mockResolvedValueOnce({ _sum: { totalTokens: 5 } })
       }
     }
   };

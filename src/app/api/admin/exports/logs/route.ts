@@ -12,27 +12,22 @@ export async function GET() {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const rows = await prisma.usageLedger.findMany({
-    orderBy: { date: "desc" },
-    take: 1000
+  const rows = await prisma.logEvent.findMany({
+    orderBy: { createdAt: "desc" },
+    take: 2000
   });
 
-  const header = "date,userId,parentId,childId,messagesCount,inputTokens,outputTokens,totalTokens,estimatedTokenCostToman,modelUsed,outcome";
+  const header = "createdAt,eventType,severity,userId,childId,message";
   const csv = [
     header,
     ...rows.map((row) =>
       [
-        row.date.toISOString(),
-        row.userId,
-        row.parentId,
+        row.createdAt.toISOString(),
+        row.eventType,
+        row.severity,
+        row.userId ?? "",
         row.childId ?? "",
-        row.messagesCount,
-        row.inputTokens,
-        row.outputTokens,
-        row.totalTokens,
-        row.estimatedTokenCostToman,
-        row.modelUsed ?? "",
-        row.outcome ?? ""
+        (row.message ?? "").replace(/,/g, " ")
       ].join(",")
     )
   ].join("\n");
@@ -40,7 +35,7 @@ export async function GET() {
   return new NextResponse(csv, {
     headers: {
       "Content-Type": "text/csv",
-      "Content-Disposition": "attachment; filename=usage.csv"
+      "Content-Disposition": "attachment; filename=logs.csv"
     }
   });
 }

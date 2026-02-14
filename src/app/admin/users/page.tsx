@@ -101,11 +101,11 @@ export default async function AdminUsersPage({
                     <TableCell>
                       <div className="flex items-center gap-2">
                         {parent.subscriptions[0] ? (
-                          <Badge variant={parent.subscriptions[0].status === "ACTIVE" ? "success" : "secondary"}>
-                            {parent.subscriptions[0].plan?.name ?? "نامشخص"}
+                          <Badge variant={parent.subscriptions[0].status === "ACTIVE" ? "secondary" : "outline"}>
+                            {parent.subscriptions[0].plan?.nameFa ?? "نامشخص"}
                           </Badge>
                         ) : (
-                          <Badge variant="outline">رایگان</Badge>
+                          <Badge variant="outline">بدون اشتراک</Badge>
                         )}
                         {/* <AdminActivateSubscription subscriptionId={parent.subscriptions[0]?.id} /> */}
                       </div>
@@ -132,7 +132,9 @@ export default async function AdminUsersPage({
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                          <DropdownMenuItem>مشاهده جزئیات</DropdownMenuItem>
+                          <DropdownMenuItem asChild>
+                            <a href={`/admin/users/${parent.id}`}>مشاهده جزئیات</a>
+                          </DropdownMenuItem>
                           <DropdownMenuItem>ویرایش اشتراک</DropdownMenuItem>
                           <DropdownMenuItem className="text-destructive">مسدود کردن</DropdownMenuItem>
                         </DropdownMenuContent>

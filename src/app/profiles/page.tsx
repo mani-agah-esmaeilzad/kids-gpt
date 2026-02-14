@@ -9,7 +9,6 @@ export default async function ProfilesPage() {
   let parentId: string | null = null;
   let profiles: any[] = [];
   let hasActivePlan = false;
-  let isFreePlan = false;
   let isParentLoggedIn = Boolean(session?.user?.id);
 
   if (session?.user?.id) {
@@ -44,7 +43,6 @@ export default async function ProfilesPage() {
   if (parentId) {
     const subscription = await getActiveSubscription(parentId);
     hasActivePlan = Boolean(subscription);
-    isFreePlan = subscription?.plan?.name === "رایگان";
   }
 
   if (!parentId) {

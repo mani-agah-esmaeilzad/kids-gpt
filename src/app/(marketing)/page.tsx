@@ -5,6 +5,9 @@ import { FaqSection } from "@/components/marketing/faq-section";
 import { FinalCta } from "@/components/marketing/final-cta";
 import { PricingCards } from "@/components/pricing-cards"; // Reusing existing component but wrapping it
 
+export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
+
 export default function MarketingPage() {
     return (
         <div className="flex flex-col min-h-screen">

@@ -45,6 +45,13 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Not allowed" }, { status: 403 });
   }
 
+  const subscription = await prisma.subscription.findFirst({
+    where: { parentId: child.parentId, status: "ACTIVE" }
+  });
+  if (!subscription) {
+    return NextResponse.json({ error: "Subscription required" }, { status: 402 });
+  }
+
   const deviceId = await getOrCreateDeviceId();
   await prisma.kidDeviceSession.upsert({
     where: { deviceId },
